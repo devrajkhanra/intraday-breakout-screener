@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
 import {
   createChart} from 'lightweight-charts'
-import type {CandlestickData,
+import type { CandlestickData,
   HistogramData,
   UTCTimestamp,
+  SeriesMarkerPosition,
 } from 'lightweight-charts';
 import { useBreakoutStore } from '../store/useBreakoutStore';
+import { generateNarrative } from '../utils/generativeNarrative';
 
 const TradingViewChart = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -20,16 +22,12 @@ const TradingViewChart = () => {
       width: containerRef.current.clientWidth,
       layout: { backgroundColor: '#ffffff', textColor: '#333' },
       grid: { vertLines: { color: '#eee' }, horzLines: { color: '#eee' } },
-      timeScale: { timeVisible: true, borderColor: '#ddd' },
-      rightPriceScale: { borderColor: '#ddd' },
+      timeScale: { timeVisible: true },
+      rightPriceScale: { borderVisible: true },
     });
 
-    // 🕯️ Main Candlestick Price Series
-    const candlestickSeries = chart.addCandlestickSeries({
-      priceScaleId: 'right',
-    });
+    const candleSeries = chart.addCandlestickSeries({ priceScaleId: 'right' });
 
-    // 📊 Volume Series BELOW candles
     const volumeSeries = chart.addHistogramSeries({
       priceFormat: { type: 'volume' },
       color: '#60a5fa',
@@ -37,7 +35,6 @@ const TradingViewChart = () => {
       scaleMargins: { top: 0.8, bottom: 0 },
     });
 
-    // 📦 Delivery Volume Series BELOW candles
     const deliverySeries = chart.addHistogramSeries({
       priceFormat: { type: 'volume' },
       color: '#a78bfa',
@@ -65,23 +62,42 @@ const TradingViewChart = () => {
       color: '#a78bfa',
     }));
 
-    candlestickSeries.setData(candles);
+    candleSeries.setData(candles);
     volumeSeries.setData(volumes);
     deliverySeries.setData(deliveries);
 
+    // 🎯 Marker annotations per candle
+    const markers = data.map((d, i) => {
+      const narrative = generateNarrative(d, data[i - 1]);
+      return {
+        time: convertDate(d.date),
+        position: 'aboveBar',
+        color: narrative.color,
+        shape: 'arrowUp',
+        text: `${narrative.marker} ${narrative.probability}%`,
+      };
+    });
+
+    candleSeries.setMarkers(markers as any);
+
+    // 💬 Tooltip narrative
     chart.subscribeCrosshairMove(param => {
       if (param?.time && tooltipRef.current) {
         const index = candles.findIndex(c => c.time === param.time);
         if (index !== -1) {
           const row = data[index];
-          const percent = ((row.deliveryQty / row.volume) * 100).toFixed(2);
+          const deliveryPercent = ((row.deliveryQty / row.volume) * 100).toFixed(2);
+          const narrative = generateNarrative(row, data[index - 1]);
+
           tooltipRef.current.innerHTML = `
             <div class="text-sm font-mono p-2 bg-white rounded shadow-md border border-gray-300 space-y-1">
               <div>📅 <b>${row.date}</b></div>
               <div>💰 Close: ₹${row.close}</div>
               <div>📊 Volume: ${row.volume.toLocaleString()}</div>
               <div>📦 Delivery: ${row.deliveryQty.toLocaleString()}</div>
-              <div>📈 Delivery %: ${percent}%</div>
+              <div>📈 Delivery %: ${deliveryPercent}%</div>
+              <div>💬 ${narrative.summary}</div>
+              <div>🔮 Anticipation: ${narrative.probability}%</div>
             </div>
           `;
         }
