@@ -1,17 +1,18 @@
-// BreakoutCard.tsx
 import { useBreakoutStore } from '../store/useBreakoutStore';
 
 const BreakoutCard = () => {
-  const breakoutDates = useBreakoutStore(state => state.breakoutDays());
+  const breakoutDates = useBreakoutStore(state => state.breakoutDates);
 
   return (
-    <div className="grid gap-2">
-      <h2 className="text-lg font-bold text-blue-500">🔥 Breakout Sessions</h2>
-      {breakoutDates.map(date => (
-        <div key={date} className="bg-blue-100 p-2 rounded-md shadow-sm">
-          {date}
-        </div>
-      ))}
+    <div className="bg-blue-50 p-4 rounded shadow-md">
+      <h2 className="text-lg font-bold text-blue-700 mb-2">🔥 Breakout Sessions</h2>
+      <ul className="space-y-1">
+        {breakoutDates.map(date => (
+          <li key={date} className="bg-white rounded px-3 py-1 shadow">
+            {date}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };
