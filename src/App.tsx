@@ -1,5 +1,5 @@
 import UploadCSV from './components/UploadCSV';
-import TradingViewChart from './components/TradingVIewChart';
+import TradingViewChart from './components/TradingViewChart';
 
 export default function App() {
   return (
