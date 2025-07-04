@@ -9,7 +9,6 @@ import type {
   HistogramData,
   UTCTimestamp,
   IChartApi,
-  ISeriesApi,
   MouseEventParams,
 } from 'lightweight-charts';
 import { useBreakoutStore } from '../store/useBreakoutStore';
@@ -22,6 +21,7 @@ const TradingViewChart = () => {
   const chartRef = useRef<IChartApi | null>(null);
   const [currentData, setCurrentData] = useState<any>(null);
   const [analysis, setAnalysis] = useState<any>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
   const data = useBreakoutStore(state => state.data);
 
   useEffect(() => {
@@ -36,31 +36,32 @@ const TradingViewChart = () => {
       height: 600,
       width: containerRef.current.clientWidth,
       layout: {
-        background: { type: ColorType.Solid, color: '#1a1a1a' },
-        textColor: '#d1d5db',
+        background: { type: ColorType.Solid, color: '#0f172a' },
+        textColor: '#e2e8f0',
       },
       grid: {
-        vertLines: { color: '#374151', style: LineStyle.Dotted },
-        horzLines: { color: '#374151', style: LineStyle.Dotted },
+        vertLines: { color: '#1e293b', style: LineStyle.Solid },
+        horzLines: { color: '#1e293b', style: LineStyle.Solid },
       },
       timeScale: {
         timeVisible: true,
         secondsVisible: false,
-        borderColor: '#4b5563',
+        borderColor: '#334155',
+        rightOffset: 12,
       },
       rightPriceScale: {
-        borderColor: '#4b5563',
-        scaleMargins: { top: 0.1, bottom: 0.4 },
+        borderColor: '#334155',
+        scaleMargins: { top: 0.05, bottom: 0.3 },
       },
       crosshair: {
         mode: 1,
         vertLine: {
-          color: '#6b7280',
+          color: '#64748b',
           width: 1,
           style: LineStyle.Dashed,
         },
         horzLine: {
-          color: '#6b7280',
+          color: '#64748b',
           width: 1,
           style: LineStyle.Dashed,
         },
@@ -71,11 +72,11 @@ const TradingViewChart = () => {
 
     // Main candlestick series
     const candleSeries = chart.addCandlestickSeries({
-      upColor: '#10b981',
+      upColor: '#22c55e',
       downColor: '#ef4444',
-      borderUpColor: '#10b981',
+      borderUpColor: '#22c55e',
       borderDownColor: '#ef4444',
-      wickUpColor: '#10b981',
+      wickUpColor: '#22c55e',
       wickDownColor: '#ef4444',
       priceScaleId: 'right',
     });
@@ -96,7 +97,7 @@ const TradingViewChart = () => {
       scaleMargins: { top: 0.7, bottom: 0 },
     });
 
-    // Prepare data
+    // Prepare clean data without markers
     const candles: CandlestickData[] = data.map(d => ({
       time: convertDate(d.date),
       open: d.open,
@@ -108,13 +109,13 @@ const TradingViewChart = () => {
     const volumes: HistogramData[] = data.map(d => ({
       time: convertDate(d.date),
       value: d.volume,
-      color: d.close >= d.open ? '#10b98150' : '#ef444450',
+      color: d.close >= d.open ? '#3b82f640' : '#ef444440',
     }));
 
     const deliveries: HistogramData[] = data.map(d => ({
       time: convertDate(d.date),
       value: d.deliveryQty,
-      color: '#8b5cf650',
+      color: '#8b5cf640',
     }));
 
     // Set data
@@ -122,8 +123,8 @@ const TradingViewChart = () => {
     volumeSeries.setData(volumes);
     deliverySeries.setData(deliveries);
 
-    // Add support/resistance lines
-    addTechnicalLevels(chart, data);
+    // Add clean technical levels
+    addCleanTechnicalLevels(chart, data);
 
     // Crosshair move handler
     chart.subscribeCrosshairMove((param: MouseEventParams) => {
@@ -139,19 +140,17 @@ const TradingViewChart = () => {
             index,
             analysis: technicalAnalysis,
           });
+          setShowTooltip(true);
         }
       } else {
-        // Show latest data when not hovering
+        setShowTooltip(false);
+        // Show latest data analysis
         const latestIndex = data.length - 1;
         const latestData = data[latestIndex];
         const prevData = data[latestIndex - 1];
         const technicalAnalysis = generateTechnicalAnalysis(latestData, prevData, data.slice(Math.max(0, latestIndex - 20)));
         
-        setCurrentData({
-          ...latestData,
-          index: latestIndex,
-          analysis: technicalAnalysis,
-        });
+        setAnalysis(technicalAnalysis);
       }
     });
 
@@ -163,11 +162,6 @@ const TradingViewChart = () => {
       const technicalAnalysis = generateTechnicalAnalysis(latestData, prevData, data.slice(Math.max(0, latestIndex - 20)));
       
       setAnalysis(technicalAnalysis);
-      setCurrentData({
-        ...latestData,
-        index: latestIndex,
-        analysis: technicalAnalysis,
-      });
     }
 
     // Handle resize
@@ -191,15 +185,27 @@ const TradingViewChart = () => {
   }, [data]);
 
   return (
-    <div className="bg-gray-900 rounded-lg overflow-hidden shadow-2xl">
-      <div className="bg-gray-800 px-4 py-2 border-b border-gray-700">
-        <h2 className="text-lg font-semibold text-white">Technical Analysis Chart</h2>
+    <div className="bg-slate-900 rounded-xl overflow-hidden shadow-2xl border border-slate-700">
+      <div className="bg-slate-800 px-6 py-4 border-b border-slate-700">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-white">Price Chart</h2>
+          <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-blue-500 rounded"></div>
+              <span className="text-slate-300">Volume</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-purple-500 rounded"></div>
+              <span className="text-slate-300">Delivery</span>
+            </div>
+          </div>
+        </div>
       </div>
       
       <div className="relative">
         <div ref={containerRef} className="w-full h-[600px]" />
         
-        {currentData && (
+        {showTooltip && currentData && (
           <TechnicalTooltip data={currentData} />
         )}
       </div>
@@ -211,45 +217,28 @@ const TradingViewChart = () => {
   );
 };
 
-function addTechnicalLevels(chart: IChartApi, data: any[]) {
+function addCleanTechnicalLevels(chart: IChartApi, data: any[]) {
   if (data.length < 20) return;
 
-  // Calculate support and resistance levels
-  const prices = data.map(d => d.close);
-  const highs = data.map(d => d.high);
-  const lows = data.map(d => d.low);
+  // Calculate clean support and resistance levels
+  const recentData = data.slice(-20);
+  const highs = recentData.map(d => d.high);
+  const lows = recentData.map(d => d.low);
+  const closes = recentData.map(d => d.close);
 
-  // Simple support/resistance calculation
-  const resistance = Math.max(...highs.slice(-20));
-  const support = Math.min(...lows.slice(-20));
-  const currentPrice = prices[prices.length - 1];
+  // Simple but effective support/resistance calculation
+  const resistance = Math.max(...highs);
+  const support = Math.min(...lows);
 
-  // Add horizontal lines for key levels
-  const priceLine1 = {
-    price: resistance,
-    color: '#ef4444',
-    lineWidth: 2,
-    lineStyle: LineStyle.Dashed,
-    axisLabelVisible: true,
-    title: 'Resistance',
-  };
-
-  const priceLine2 = {
-    price: support,
-    color: '#10b981',
-    lineWidth: 2,
-    lineStyle: LineStyle.Dashed,
-    axisLabelVisible: true,
-    title: 'Support',
-  };
-
-  // Add moving average line
-  const ma20 = calculateMovingAverage(prices, 20);
+  // Add clean moving average line
+  const ma20 = calculateMovingAverage(closes, 20);
   if (ma20.length > 0) {
     const maLine = chart.addLineSeries({
       color: '#f59e0b',
       lineWidth: 2,
       title: 'MA(20)',
+      lastValueVisible: false,
+      priceLineVisible: false,
     });
 
     const maData = ma20.map((value, index) => ({
